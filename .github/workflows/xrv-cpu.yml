@@ -26,8 +26,8 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
-            intel/omix:0.5.0-devel-ubuntu26.04 \
-            bash -lc 'set -euo pipefail; apt-get update; apt-get install -y --no-install-recommends ninja-build; source scripts/oneapi-env.sh && cmake -S . -B build -GNinja -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 --target xenithium-probe xenithium-xrv-qsa-select xenithium-xrv-qsa-sparse-attention'
+            intel/oneapi-toolkit:2026.2.0-devel-ubuntu26.04 \
+            bash -lc 'apt-get update; apt-get install -y --no-install-recommends ca-certificates gnupg wget; wget -q https://repositories.intel.com/gpu/intel-graphics.key -O /tmp/intel-graphics.key; gpg --dearmor -o /usr/share/keyrings/intel-graphics.gpg /tmp/intel-graphics.key; echo  deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu resolute/intel-omix/0.5 unified > /etc/apt/sources.list.d/intel-omix.list; apt-get update; apt-get install -y --no-install-recommends intel-ocloc; command -v ocloc; source scripts/oneapi-env.sh && cmake -S . -B build -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 --target xenithium-probe xenithium-xrv-qsa-select xenithium-xrv-qsa-sparse-attention'
   xrv-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 15
