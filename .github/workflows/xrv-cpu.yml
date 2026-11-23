@@ -27,7 +27,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             intel/omix:0.5.0-devel-ubuntu26.04 \
-            bash -lc 'source scripts/oneapi-env.sh && cmake -S . -B build -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 --target xenithium-probe xenithium-xrv-qsa-select xenithium-xrv-qsa-sparse-attention'
+            bash -lc 'set -euo pipefail; apt-get update; apt-get install -y --no-install-recommends ninja-build; source scripts/oneapi-env.sh && cmake -S . -B build -GNinja -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 --target xenithium-probe xenithium-xrv-qsa-select xenithium-xrv-qsa-sparse-attention'
   xrv-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 15
