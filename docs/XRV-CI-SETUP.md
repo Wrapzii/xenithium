@@ -4,7 +4,7 @@ The CPU workflow is usable immediately. GPU jobs remain skipped until repository
 
 ## Tier 1: automatic portable CI
 
-.github/workflows/xrv-cpu.yml runs on pull requests and pushes. Its portable job uses GitHub-hosted Ubuntu, Python plus the jsonschema CI dependency, checked-in synthetic fixtures, and no model/GPU. It checks PR patch whitespace, runs Python syntax checks and validates the versioned JSON Schemas against all checked-in manifests, runs all XRV tests, validates fixture checksums and independent goldens, then runs selector CPU replay and attention CPU-reference reproduction. A separate GitHub-hosted CPU build job uses Intel's oneAPI 2026.2 development container to compile the probe and replay adapters without GPU access. The portable job uploads only a small JSON summary.
+.github/workflows/xrv-cpu.yml runs on pull requests and pushes. Its portable job uses GitHub-hosted Ubuntu, Python plus the jsonschema CI dependency, checked-in synthetic fixtures, and no model/GPU. It checks PR patch whitespace, runs Python syntax checks and validates the versioned JSON Schemas against all checked-in manifests, runs all XRV tests, validates fixture checksums and independent goldens, then runs selector CPU replay and attention CPU-reference reproduction. A separate GitHub-hosted CPU build job uses Intel OMIX 0.5.0 development container (compiler plus GPU AOT tool) to compile the probe and replay adapters without GPU access. The portable job uploads only a small JSON summary.
 
 This tier compiles SYCL C++ but does not execute XPU kernels or validate GPU correctness or performance. Those require Tier 2. CPU/synthetic success is not GPU validation.
 
