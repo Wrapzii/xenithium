@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:xenithium:xrv:fixture:v2",
+  "title": "Xenithium Replay Validation fixture v2",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "fixture_id",
+    "kernel",
+    "model_fingerprint",
+    "runtime_fingerprint",
+    "tp",
+    "operation",
+    "quantization",
+    "position",
+    "masks",
+    "mutable_state",
+    "tensors",
+    "reference",
+    "provenance"
+  ],
+  "properties": {
+    "schema": {
+      "const": "org.xenithium.xrv.fixture"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "kernel": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "implementation"
+      ],
+      "properties": {
+        "id": {
+          "const": "qsa.sparse_attention.k8v4"
+        },
+        "version": {
+          "const": 1
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "model_fingerprint": {
+      "type": "object"
+    },
+    "runtime_fingerprint": {
+      "type": "object"
+    },
+    "tp": {
+      "type": "object",
+      "required": [
+        "rank",
+        "size"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "operation": {
+      "type": "object",
+      "required": [
+        "rows",
+        "q_heads",
+        "kv_heads",
+        "cards",
+        "capacity",
+        "pool_pages",
+        "table_slots",
+        "slot_pages",
+        "tiles_per_group"
+      ],
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "q_heads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kv_heads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cards": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "capacity": {
+          "type": "integer",
+          "minimum": 64
+        },
+        "pool_pages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "table_slots": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "slot_pages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tiles_per_group": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33
+        }
+      },
+      "additionalProperties": true
+    },
+    "quantization": {
+      "type": "object",
+      "required": [
+        "kv",
+        "key_scale",
+        "value_scale"
+      ],
+      "properties": {
+        "kv": {
+          "const": "K8V4"
+        },
+        "key_scale": {
+          "type": "string"
+        },
+        "value_scale": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "position": {
+      "type": "object",
+      "required": [
+        "causal",
+        "tokens_per_block",
+        "page_size"
+      ],
+      "properties": {
+        "causal": {
+          "const": true
+        },
+        "tokens_per_block": {
+          "const": 4
+        },
+        "page_size": {
+          "const": 64
+        }
+      },
+      "additionalProperties": true
+    },
+    "masks": {
+      "type": "array"
+    },
+    "mutable_state": {
+      "type": "array"
+    },
+    "tensors": {
+      "type": "object",
+      "required": [
+        "query",
+        "gate",
+        "positions",
+        "slots",
+        "page_table",
+        "keys",
+        "values",
+        "key_scales",
+        "value_scales",
+        "selected_ids",
+        "selected_counts",
+        "expected_output"
+      ],
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "file",
+          "dtype",
+          "shape",
+          "strides",
+          "byte_order",
+          "role",
+          "size_bytes",
+          "sha256"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dtype": {
+            "enum": [
+              "uint16",
+              "int32",
+              "uint8",
+              "int8",
+              "float32"
+            ]
+          },
+          "shape": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "strides": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "byte_order": {
+            "const": "little"
+          },
+          "role": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "required": [
+        "independent",
+        "source",
+        "tolerance"
+      ],
+      "properties": {
+        "independent": {
+          "const": true
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "type": "object",
+          "required": [
+            "scaled_error_max",
+            "bf16_mismatch_fraction_max"
+          ],
+          "properties": {
+            "scaled_error_max": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "bf16_mismatch_fraction_max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

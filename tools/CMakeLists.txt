@@ -69,4 +69,10 @@ xenithium_tool(xenithium-probe
   SOURCES probe/main.cpp probe/flags.cpp probe/moe.cpp probe/gdn.cpp probe/qsa.cpp probe/ple.cpp probe/model.cpp probe/mtp.cpp probe/seqs.cpp probe/serve.cpp
           probe/prefix.cpp probe/qwen35.cpp probe/qwen35_gdn.cpp probe/qwen35_attn.cpp probe/qwen35_model.cpp probe/qwen35_dflash.cpp
           probe/qwen35_prefix.cpp probe/qwen35_select.cpp probe/qwen35_headx.cpp probe/llama.cpp probe/flint.cpp probe/rank.cpp probe/dflash38.cpp
-  LIBS xenithium_kernels xenithium_arch xenithium_eval xenithium_gpu_engine)
+          xrv/qsa_capture.cpp)
+target_include_directories(xenithium-probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(xenithium-probe PRIVATE xenithium_kernels xenithium_arch xenithium_eval xenithium_gpu_engine)
+
+# Kernel Replay Validation: direct replay of the production QSA top-512 selector from a validated XRV fixture.
+xenithium_tool(xenithium-xrv-qsa-select SOURCES xrv/qsa_select_xpu.cpp LIBS xenithium_kernels)
+xenithium_tool(xenithium-xrv-qsa-sparse-attention SOURCES xrv/qsa_sparse_attention_xpu.cpp LIBS xenithium_kernels)

@@ -98,6 +98,7 @@
 #include "xenithium/rt/device.hpp"
 
 #include "probe.hpp"
+#include "xrv/qsa_capture.hpp"
 
 namespace {
 
@@ -1677,6 +1678,7 @@ int cmd_store(const Options &o) {
 
 
 int main(int argc, char **argv) {
+  if (!xenithium::xrv::install_probe_qsa_capture_from_env()) return 2;
   if (argc >= 2 && std::string(argv[1]) == "rank") {  // a hot-expert ranking for a MoE checkpoint (rank.cpp)
     try {
       return cmd_rank(argc - 2, argv + 2);

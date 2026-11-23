@@ -10,3 +10,7 @@
 # the shipped settings are models/presets/
 /models/*
 !/models/presets/
+
+# Python XRV tooling
+__pycache__/
+*.py[cod]

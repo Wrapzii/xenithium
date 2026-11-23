@@ -1,0 +1,284 @@
+{
+  "fixture_id": "qsa-k8v4-sparse-synthetic",
+  "kernel": {
+    "id": "qsa.sparse_attention.k8v4",
+    "implementation": "xenithium::kernels::xrv::sparse_attention",
+    "version": 1
+  },
+  "masks": [
+    {
+      "kind": "position-bounded selected blocks plus open-block tail",
+      "name": "causal"
+    }
+  ],
+  "model_fingerprint": {
+    "kind": "synthetic-Qwen-QSA-topology",
+    "sha256": null,
+    "weights_included": false
+  },
+  "mutable_state": [],
+  "operation": {
+    "capacity": 2112,
+    "cards": 2,
+    "kv_heads": 2,
+    "pool_pages": 66,
+    "q_heads": 24,
+    "rows": 2,
+    "selection_contract": "512 ascending logical blocks; causal tail appended",
+    "slot_pages": 33,
+    "table_slots": 2,
+    "tiles_per_group": 1
+  },
+  "position": {
+    "causal": true,
+    "kind": "per-row logical token positions",
+    "page_size": 64,
+    "page_table": "slot x logical page -> physical page",
+    "tokens_per_block": 4
+  },
+  "provenance": {
+    "contains_model_weights": false,
+    "contains_prompt_data": false,
+    "generator": "tools/xrv/make_qsa_attention.py",
+    "kind": "deterministic-synthetic",
+    "purpose": "long sparse selection, short every-block path, permuted page table, packed K8/V4, zero scales and BF16 gate",
+    "seed": "integer formulas; no random state"
+  },
+  "quantization": {
+    "k_code": "signed-symmetric-int8",
+    "key_scale": "float32-per-token",
+    "kv": "K8V4",
+    "v_code": "signed-symmetric-int4",
+    "value_scale": "bf16-per-32-dims"
+  },
+  "reference": {
+    "candidate_output_is_not_golden": true,
+    "independent": true,
+    "kind": "independent-float64-reference",
+    "source": "tools/xrv/qsa_attention.py reference_output: float64 softmax over independently dequantized packed K8/V4 bytes, page mappings, and explicit production BF16 gate-rounding points; candidate output is excluded",
+    "tolerance": {
+      "bf16_mismatch_fraction_max": 0.005,
+      "scaled_error_max": 0.015625
+    }
+  },
+  "runtime_fingerprint": {
+    "compiler": null,
+    "device": null,
+    "driver": null,
+    "kind": "synthetic-fixture"
+  },
+  "schema": "org.xenithium.xrv.fixture",
+  "schema_version": 2,
+  "tensors": {
+    "expected_output": {
+      "byte_order": "little",
+      "dtype": "uint16",
+      "file": "expected_output.u16le",
+      "role": "independent_reference",
+      "sha256": "c1ce12c408d0ebfc021bea8689b1a5546051857a513ea3893474c95fe2607da8",
+      "shape": [
+        2,
+        12,
+        256
+      ],
+      "size_bytes": 12288,
+      "strides": [
+        3072,
+        256,
+        1
+      ]
+    },
+    "gate": {
+      "byte_order": "little",
+      "dtype": "uint16",
+      "file": "gate.u16le",
+      "role": "input",
+      "sha256": "0afb3bb63e3ff65b2bd87f1525be953a01e5ed0359300a60ce396ec6462d621d",
+      "shape": [
+        2,
+        12,
+        256
+      ],
+      "size_bytes": 12288,
+      "strides": [
+        3072,
+        256,
+        1
+      ]
+    },
+    "key_scales": {
+      "byte_order": "little",
+      "dtype": "float32",
+      "file": "key_scales.f32le",
+      "role": "input",
+      "sha256": "67bc3ac9e20eb1b2ff741c03cf5aa8390c5247229179b6469651d44e80b2e4f3",
+      "shape": [
+        66,
+        1,
+        64
+      ],
+      "size_bytes": 16896,
+      "strides": [
+        64,
+        64,
+        1
+      ]
+    },
+    "keys": {
+      "byte_order": "little",
+      "dtype": "uint8",
+      "file": "keys.u8",
+      "role": "input",
+      "sha256": "0c8c94840827a85ec00cfb3322b1ac043659e551fbe53bc8c48f6736f61a5e58",
+      "shape": [
+        66,
+        1,
+        64,
+        256
+      ],
+      "size_bytes": 1081344,
+      "strides": [
+        16384,
+        16384,
+        256,
+        1
+      ]
+    },
+    "page_table": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "page_table.i32le",
+      "role": "input",
+      "sha256": "b9bebeb5ae5982db7669bd7108236882b14e0b3ef610d7c0f1eec9a6a06560f9",
+      "shape": [
+        2,
+        33
+      ],
+      "size_bytes": 264,
+      "strides": [
+        33,
+        1
+      ]
+    },
+    "positions": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "positions.i32le",
+      "role": "input",
+      "sha256": "0869f152b1407f48bbafede46da612dfec234b65fa26a73ec0807d6f6fbb75fa",
+      "shape": [
+        2
+      ],
+      "size_bytes": 8,
+      "strides": [
+        1
+      ]
+    },
+    "query": {
+      "byte_order": "little",
+      "dtype": "uint16",
+      "file": "query.u16le",
+      "role": "input",
+      "sha256": "a30332d491106f0448c218876f3123e7dd474818c7c8207e52b8b791ee4827a7",
+      "shape": [
+        2,
+        12,
+        256
+      ],
+      "size_bytes": 12288,
+      "strides": [
+        3072,
+        256,
+        1
+      ]
+    },
+    "selected_counts": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "selected_counts.i32le",
+      "role": "input",
+      "sha256": "a880da016ece843c9f875bbd780b5e8d4401f6cb6df5ea45646e5e878f93cf53",
+      "shape": [
+        2
+      ],
+      "size_bytes": 8,
+      "strides": [
+        1
+      ]
+    },
+    "selected_ids": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "selected_ids.i32le",
+      "role": "input",
+      "sha256": "9afe9b4d10b031b33a03875a5242dab2d023f92d36aeded3428d1bfbf44beb72",
+      "shape": [
+        2,
+        512
+      ],
+      "size_bytes": 4096,
+      "strides": [
+        512,
+        1
+      ]
+    },
+    "slots": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "slots.i32le",
+      "role": "input",
+      "sha256": "01acecb507abfe1a354aa8064f4af5d3f1acd019e37db3c11c97523b71c76e9d",
+      "shape": [
+        2
+      ],
+      "size_bytes": 8,
+      "strides": [
+        1
+      ]
+    },
+    "value_scales": {
+      "byte_order": "little",
+      "dtype": "uint16",
+      "file": "value_scales.u16le",
+      "role": "input",
+      "sha256": "69c6b38ba34eab6087246f5b5791d6566cdddb4590187fb1474df8e844c9dc19",
+      "shape": [
+        66,
+        1,
+        64,
+        8
+      ],
+      "size_bytes": 67584,
+      "strides": [
+        512,
+        512,
+        8,
+        1
+      ]
+    },
+    "values": {
+      "byte_order": "little",
+      "dtype": "uint8",
+      "file": "values.u8",
+      "role": "input",
+      "sha256": "fbb67d01a5ba5d6d0ecbef54ce459d59e6fb78de8e646b67f84b774f643c0c1c",
+      "shape": [
+        66,
+        1,
+        64,
+        128
+      ],
+      "size_bytes": 540672,
+      "strides": [
+        8192,
+        8192,
+        128,
+        1
+      ]
+    }
+  },
+  "tp": {
+    "rank": 0,
+    "size": 2
+  }
+}

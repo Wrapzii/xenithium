@@ -263,3 +263,7 @@ models it runs are not part of it. Every checkpoint and drafter in the Supported
 own source under the terms that source sets — including the licence of the base model a quantised export was made
 from — and this project neither grants nor changes those terms. Check the licence on each download page and meet it
 before using the weights or passing their output on; [NOTICE](NOTICE) names the third-party parts of the engine itself.
+
+## Kernel replay validation
+
+For QSA selector fixture replay, exact top-k checks, and replay-first kernel workflows, see [docs/XRV.md](docs/XRV.md). Current adapter coverage and pending work are listed there explicitly.

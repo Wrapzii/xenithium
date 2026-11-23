@@ -1,0 +1,78 @@
+name: XRV CPU validation
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  xrv-sycl-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check PR patch whitespace
+        if: github.event_name == 'pull_request'
+        run: git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.sha }}"
+      - name: Compile the probe and XRV adapters without a GPU
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            intel/oneapi-toolkit:2026.2.0-devel-ubuntu26.04 \
+            bash -lc 'source scripts/oneapi-env.sh && cmake -S . -B build -DCMAKE_CXX_COMPILER=icpx -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 2 --target xenithium-probe xenithium-xrv-qsa-select xenithium-xrv-qsa-sparse-attention'
+  xrv-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install fixture schema validator
+        run: python -m pip install -r tools/xrv/requirements-ci.txt
+      - name: Python syntax, schema, and fixture tests
+        run: |
+          python -m py_compile tools/xrv/xrv.py tools/xrv/qsa_attention.py tools/xrv/make_synthetic.py tools/xrv/make_qsa_attention.py tools/xrv/tests/test_xrv.py
+          python -m json.tool tools/xrv/fixture-schema-v1.json >/dev/null
+          python -m json.tool tools/xrv/fixture-schema-v2.json >/dev/null
+          python -m unittest discover -s tools/xrv/tests -v
+      - name: Validate fixture checksums and independent goldens
+        run: |
+          scripts/xrv validate tests/data/xrv/qsa-select-synthetic
+          scripts/xrv validate tests/data/xrv/qsa-select-max-bound
+          scripts/xrv validate tests/data/xrv/qsa-k8v4-sparse-synthetic
+      - name: Portable CPU/reference replay
+        run: |
+          scripts/xrv replay --fixture tests/data/xrv/qsa-select-synthetic --backend cpu --output "$RUNNER_TEMP/xrv-select"
+          scripts/xrv replay --fixture tests/data/xrv/qsa-select-max-bound --backend cpu --output "$RUNNER_TEMP/xrv-select-max"
+          scripts/xrv replay --fixture tests/data/xrv/qsa-k8v4-sparse-synthetic --backend cpu --output "$RUNNER_TEMP/xrv-attention-reference"
+          python - "$RUNNER_TEMP/xrv-select/comparison.json" "$RUNNER_TEMP/xrv-select-max/comparison.json" "$RUNNER_TEMP/xrv-attention-reference/comparison.json" "$RUNNER_TEMP/xrv-cpu-summary.json" <<'PY'
+          import hashlib,json,platform,sys
+          paths=sys.argv[1:4]
+          reports=[json.load(open(p,encoding="utf-8")) for p in paths]
+          names=["qsa-select-synthetic","qsa-select-max-bound","qsa-k8v4-sparse-synthetic"]
+          fixtures=[]
+          for name,r in zip(names,reports):
+              digest=hashlib.sha256(open("tests/data/xrv/"+name+"/manifest.json","rb").read()).hexdigest()
+              count=r.get("mismatch_count",r.get("bf16_bitwise_mismatch_count"))
+              fixtures.append({"fixture_id":r["fixture_id"],"manifest_sha256":digest,"kernel_id":r["kernel_id"],"correctness":r["status"],"mismatch_count":count})
+          result={"tier":"cpu-portable","mode":"kernel-only-and-independent-reference","fixtures":fixtures,"hardware":{"host_platform":platform.platform()},"performance_change_percent":None,"gpu_validation":False}
+          json.dump(result,open(sys.argv[4],"w",encoding="utf-8"),indent=2,sort_keys=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xrv-cpu-summary
+          path: ${{ runner.temp }}/xrv-cpu-summary.json
+          if-no-files-found: warn
+          retention-days: 14
