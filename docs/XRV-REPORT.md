@@ -20,7 +20,15 @@ The final 28-test CPU suite duration is recorded after the full final run below.
 
 The independent Python attention reference dequantizes packed K8/V4 and computes float64 softmax, with explicit BF16 rounding for the production gate path. Candidate output comparison reports mismatch count, first mismatch, samples, max absolute/relative/scaled error and tolerance violations. Discrete selector IDs/counts remain exact checks. Captured candidate output is never used as the golden.
 
-The selector XPU adapter, attention XPU adapter, probe capture-hook translation unit, and full xenithium-probe target built successfully on the available IntelLLVM 2025.3.2 toolchain. That is a compile check, not qualification against the repository setup guide’s oneAPI 2026.2 version. The probe and adapters were not run. No GPU adapter has run in this turn. The capture hook adds an atomic callback-pointer check on the QSA decode host path when it runs; this disabled-path overhead has not been measured and should be recorded in the next trusted GPU validation. Therefore no real Intel GPU kernel correctness, timing, TP2 critical path, full model throughput, or production result is claimed. CPU/reference pass means only that the checked-in fixture and independent reference are internally consistent.
+The selector XPU adapter, attention XPU adapter, probe capture-hook translation unit, and full xenithium-probe target built successfully on IntelLLVM 2025.3.2. The two authorized synthetic XPU replays then completed successfully on a single Intel device using oneAPI 2025.3.2:
+
+| Adapter | Comparison | Result |
+| --- | --- | --- |
+| QSA selector | Exact selected-ID comparison | Pass; 0 mismatches across 2,048 IDs |
+| K8V4 sparse attention + merge | Declared numeric tolerance | Pass; 0 tolerance violations; 17/6,144 BF16 values differed bitwise |
+
+These results establish execution and fixture-level correctness for the tested single-device adapter paths. They do not establish TP2 correctness or critical-path latency, correctness on production captures, full-model behavior, or end-to-end throughput. They also do not qualify the oneAPI 2026.2 CI toolchain. No performance claim was measured, and the oneDNN A/B was not run. The production restore and service checks were reported separately from these XRV replays. Replay logs remain in the authorized ai01 run directory and are not included in the repository. The capture hook adds an atomic callback-pointer check on the QSA decode host path when enabled; its disabled-path overhead has not been measured.
+
 
 Tier 1 CPU CI runs Python/schemas/checksums/references and both synthetic replay flows. Tier 2 B60 remains manual and gated until an isolated runner is enrolled and explicitly authorized. No GPU runner has been enrolled by this implementation.
 

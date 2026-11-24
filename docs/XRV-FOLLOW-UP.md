@@ -1,6 +1,6 @@
 # XRV staged follow-up work
 
-XRV KRV currently covers production QSA selection and K8V4 sparse attention plus merge. It does not prove complete model behavior, prefill gains, concurrency, or end-to-end speed. XPU correctness/performance has not yet run on Intel GPU hardware.
+XRV KRV currently covers production QSA selection and K8V4 sparse attention plus merge. Two synthetic-fixture XPU replays passed on a single Intel device with oneAPI 2025.3.2: selector IDs matched exactly (0/2,048 mismatches), and attention had 0 declared-tolerance violations (17/6,144 BF16 bitwise differences). XPU correctness has therefore been exercised for these fixture-level paths. This does not prove production-capture correctness, TP2 behavior, complete model behavior, prefill gains, concurrency, or end-to-end speed. XPU performance and the oneDNN A/B have not been measured; oneAPI 2026.2 GPU qualification remains pending.
 
 ## Next KRV adapters
 

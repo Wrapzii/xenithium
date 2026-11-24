@@ -5,7 +5,7 @@ XRV is the replay-first workflow for kernel changes. Kernel Replay Validation (K
 - qsa.select: production QSA top-k selection on captured scores; correctness is exact selected IDs/counts against a stable independent CPU reference.
 - qsa.sparse_attention.k8v4: production packed K8/V4 sparse attention plus output merge on captured query, gate, block IDs, pages and packed cache; correctness is compared to an independent float64 reference with explicit BF16 tolerances.
 
-Neither adapter loads the 27B model during replay. The checked-in fixtures are synthetic. The selector and attention adapters have compiled, but no Intel GPU has run them yet; CPU fixture/reference checks are not GPU-kernel validation. Attention coverage is non-tree decode; scoring, long-prefill append, GDN, FFN/GEMM, DSpine and full stateful model replay remain follow-up work.
+Neither adapter loads the 27B model during replay. The checked-in fixtures are synthetic inputs, and both production adapters have now run on Intel XPU using those fixtures (single-device, oneAPI 2025.3.2). Selector comparison passed exactly: 0 mismatches across 2,048 selected IDs. K8V4 sparse attention passed its declared tolerance: 0 violations, with 17 of 6,144 BF16 outputs differing bitwise. This establishes GPU execution and fixture-level correctness for those tested paths; it does not establish TP2, production-input, full-model, or performance results, and it is not the oneAPI 2026.2 CI environment. The oneDNN A/B was not run. Attention coverage is non-tree decode; scoring, long-prefill append, GDN, FFN/GEMM, DSpine and full stateful model replay remain follow-up work.
 
 ## Five-minute CPU start
 
