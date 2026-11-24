@@ -263,10 +263,35 @@ QsaEvents qsa_rows(sycl::queue &q, const QsaShape &s, int m, const qsa_bf16 *x, 
                    const int32_t *words, int word_stride, int64_t pos0, const QsaScratch &sc, const QsaRowsScratch &rs, const PairRowsWire *wire,
                    int wire_parity, qsa_bf16 *out);
 
-// The select stage alone (tests): rows' keys in score [rows][stride], nblk[r] keys per row (device
-// words), top-512 -> sel / sel_n (candidate buffers sized for `rows`). bound = the largest nblk (grid size).
+// Opt-in host callback for a selector-boundary capture. Register once before launching work; with no callback the
+// selector only performs a null function-pointer check. A capture callback may enqueue copies after `complete` and wait;
+// it must not throw and must not retain device pointers after returning. The normal server never registers this hook.
+struct QsaSelectCaptureView {
+  int rows = 0, stride = 0, bound = 0, chunk = 0, tp_rank = 0, tp_size = 1;
+  const uint32_t *scores = nullptr;
+  const int32_t *nblk = nullptr, *selected_ids = nullptr, *selected_counts = nullptr;
+  sycl::event first, complete;
+};
+using QsaSelectCaptureHook = void (*)(sycl::queue &q, const QsaSelectCaptureView &view, void *user) noexcept;
+void qsa_set_select_capture_hook(QsaSelectCaptureHook hook, void *user = nullptr) noexcept;
+
+// Opt-in capture of one decode attention boundary. The callback may wait for complete, copy device inputs/output,
+// and must not retain device pointers or throw. Production does not register this hook.
+struct QsaSparseAttentionCaptureView {
+  int rows = 0, projection_stride = 0, tp_rank = 0, tp_size = 1;
+  QsaShape shape;
+  QsaCache cache;
+  QsaStep step;
+  QsaScratch scratch;
+  sycl::event complete;
+};
+using QsaSparseAttentionCaptureHook = void (*)(sycl::queue &q, const QsaSparseAttentionCaptureView &view, void *user) noexcept;
+void qsa_set_sparse_attention_capture_hook(QsaSparseAttentionCaptureHook hook, void *user = nullptr) noexcept;
+
+// The select stage alone: rows' keys in score [rows][stride], nblk[r] keys per row (device words), top-512 -> sel / sel_n
+// (candidate buffers sized for `rows`). bound = the largest nblk (grid size). Optional TP identity is for capture metadata.
 sycl::event qsa_select(sycl::queue &q, int rows, const uint32_t *score, int stride, const int32_t *nblk, int bound, const QsaScratch &sc,
-                       sycl::event *merge = nullptr, int chunk = 0);
+                       sycl::event *merge = nullptr, int chunk = 0, int tp_rank = 0, int tp_size = 1);
 // Blocks per select chunk for a bound: max(4,096, bound / 16) up to 16,384; one launch
 // (no merge) while bound <= the chunk. qsa_select's chunk 0 = this (decode); qsa_rows passes 16,384.
 int qsa_select_chunk(int bound);

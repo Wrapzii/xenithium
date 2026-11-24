@@ -1,0 +1,122 @@
+{
+  "fixture_id": "qsa-select-synthetic",
+  "kernel": {
+    "id": "qsa.select",
+    "implementation": "xenithium::kernels::qsa_select",
+    "version": 1
+  },
+  "masks": [],
+  "model_fingerprint": {
+    "kind": "synthetic",
+    "sha256": null,
+    "weights_included": false
+  },
+  "mutable_state": [],
+  "operation": {
+    "bound": 8192,
+    "chunk": 4096,
+    "rows": 4,
+    "score_encoding": "nonnegative_float32_bits_as_uint32",
+    "source_stride": 16384,
+    "stride": 16384,
+    "top_k": 512
+  },
+  "position": {
+    "causal_mask": "already-applied-before-selector",
+    "kind": "selector-only",
+    "start": null
+  },
+  "provenance": {
+    "contains_model_weights": false,
+    "contains_prompt_data": false,
+    "generator": "tools/xrv/make_synthetic.py",
+    "kind": "synthetic",
+    "purpose": "selector chunk/merge, tie cutoff, and mixed candidate counts",
+    "seed": "deterministic formula; no random state"
+  },
+  "quantization": {
+    "kv": "not-present-at-selector-boundary",
+    "score_encoding": "positive-float32-order-preserving-bits"
+  },
+  "reference": {
+    "candidate_output_is_not_golden": true,
+    "independent": true,
+    "kind": "independent-host-reference",
+    "source": "xrv.reference_select: full stable ordering by descending uint32 score then ascending block ID; returned IDs ascending"
+  },
+  "runtime_fingerprint": {
+    "compiler": null,
+    "device": null,
+    "driver": null,
+    "engine_revision": null,
+    "kind": "synthetic-fixture"
+  },
+  "schema": "org.xenithium.xrv.fixture",
+  "schema_version": 1,
+  "tensors": {
+    "expected_counts": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "expected_counts.i32le",
+      "role": "independent_reference",
+      "sha256": "d853ffa60a4c3f4ceffe0f1377cf20eadedd91a77b39a0639a0a540d763d73f6",
+      "shape": [
+        4
+      ],
+      "size_bytes": 16,
+      "strides": [
+        1
+      ]
+    },
+    "expected_ids": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "expected_ids.i32le",
+      "role": "independent_reference",
+      "sha256": "3afaa858492fa22c5bda560026a22a752ddfa4c36f4feca006cad812b04464b8",
+      "shape": [
+        4,
+        512
+      ],
+      "size_bytes": 8192,
+      "strides": [
+        512,
+        1
+      ]
+    },
+    "nblk": {
+      "byte_order": "little",
+      "dtype": "int32",
+      "file": "nblk.i32le",
+      "role": "input",
+      "sha256": "7c135201b623ff81e3fca44fdd558e5dc5640fdbee1807ee7e24b9decac1b149",
+      "shape": [
+        4
+      ],
+      "size_bytes": 16,
+      "strides": [
+        1
+      ]
+    },
+    "scores": {
+      "byte_order": "little",
+      "dtype": "uint32",
+      "file": "scores.u32le",
+      "role": "input",
+      "sha256": "4a52569905656b1b06304088ecd775126cf0d8035860ad61a53ec3cafaed8b95",
+      "shape": [
+        4,
+        16384
+      ],
+      "size_bytes": 262144,
+      "strides": [
+        16384,
+        1
+      ]
+    }
+  },
+  "tp": {
+    "rank": 0,
+    "size": 1
+  }
+}

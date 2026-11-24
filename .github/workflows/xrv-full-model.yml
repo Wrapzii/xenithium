@@ -1,0 +1,49 @@
+name: XRV full-model replay (SMR pending)
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_model:
+        description: "I authorize full-model replay on the isolated model runner"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xrv-full-model-gpu
+  cancel-in-progress: false
+
+jobs:
+  full-model:
+    if: ${{ inputs.authorize_model && vars.XRV_FULL_MODEL_ENABLED == 'true' && vars.XRV_MODEL_RUNNER_ISOLATED == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: xrv-full-model
+    runs-on: [self-hosted, linux, x64, intel-xpu, b60, xrv-model]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Confirm trusted revision and idle isolated host
+        env:
+          XRV_MODEL_RUNNER_ISOLATED: ${{ vars.XRV_MODEL_RUNNER_ISOLATED }}
+        run: |
+          set -euo pipefail
+          test "$XRV_MODEL_RUNNER_ISOLATED" = true
+          git fetch --no-tags origin "$GITHUB_REF_NAME"
+          git merge-base --is-ancestor "$GITHUB_SHA" "origin/$GITHUB_REF_NAME"
+          if pgrep -f '[x]enithium-server|[x]enithium-probe|[x]enithium-bake' >/dev/null; then
+            echo "Refusing full-model run: Xenithium server/probe/bake process is active; nothing was stopped." >&2
+            exit 2
+          fi
+      - name: Require reviewed Stateful Model Replay implementation
+        run: |
+          set -euo pipefail
+          if [[ ! -x build/xenithium-xrv-smr ]]; then
+            echo "SMR is not implemented in this revision. Full-model validation remains unavailable; no model was loaded." >&2
+            exit 78
+          fi
+          echo "An SMR binary exists, but this workflow must not execute it until its reviewed suite contract is added here."
+          exit 78

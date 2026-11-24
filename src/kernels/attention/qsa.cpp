@@ -1,8 +1,10 @@
 // Xenithium · QSA decode (see qsa.hpp for the semantics, the cache layout and the row protocol).
 #include "xenithium/kernels/attention/qsa.hpp"
+#include "xenithium/kernels/attention/qsa_xrv.hpp"
 #include "xenithium/kernels/gemm/pf_dense.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <iterator>
 #include <type_traits>
 #include <cstdlib>
@@ -352,6 +354,41 @@ class QsaSelMergeK;
 class QsaSelNK;
 }  // namespace
 
+namespace {
+std::atomic<QsaSelectCaptureHook> g_qsa_select_capture_hook{nullptr};
+std::atomic<void *> g_qsa_select_capture_user{nullptr};
+std::atomic<QsaSparseAttentionCaptureHook> g_qsa_sparse_attention_capture_hook{nullptr};
+std::atomic<void *> g_qsa_sparse_attention_capture_user{nullptr};
+
+void capture_qsa_select(sycl::queue &q, int rows, const uint32_t *score, int stride, const int32_t *nblk, int bound, int chunk,
+                        const QsaScratch &sc, int tp_rank, int tp_size, const sycl::event &first, const sycl::event &complete) noexcept {
+  const auto hook = g_qsa_select_capture_hook.load(std::memory_order_acquire);
+  if (!hook) return;
+  const QsaSelectCaptureView view{rows, stride, bound, chunk, tp_rank, tp_size, score, nblk, sc.sel, sc.sel_n, first, complete};
+  hook(q, view, g_qsa_select_capture_user.load(std::memory_order_relaxed));
+}
+}  // namespace
+
+void qsa_set_select_capture_hook(QsaSelectCaptureHook hook, void *user) noexcept {
+  g_qsa_select_capture_user.store(user, std::memory_order_relaxed);
+  g_qsa_select_capture_hook.store(hook, std::memory_order_release);
+}
+
+void qsa_set_sparse_attention_capture_hook(QsaSparseAttentionCaptureHook hook, void *user) noexcept {
+  g_qsa_sparse_attention_capture_user.store(user, std::memory_order_relaxed);
+  g_qsa_sparse_attention_capture_hook.store(hook, std::memory_order_release);
+}
+
+namespace {
+void capture_qsa_sparse_attention(sycl::queue &q, const QsaShape &shape, int rows, const QsaCache &cache, const QsaStep &step,
+                                  const QsaScratch &scratch, int projection_stride, const sycl::event &complete) noexcept {
+  const auto hook = g_qsa_sparse_attention_capture_hook.load(std::memory_order_acquire);
+  if (!hook || step.tree || shape.kv != QsaKv::i8v4) return;
+  const QsaSparseAttentionCaptureView view{rows, projection_stride, shape.card, shape.cards, shape, cache, step, scratch, complete};
+  hook(q, view, g_qsa_sparse_attention_capture_user.load(std::memory_order_relaxed));
+}
+}  // namespace
+
 int qsa_select_chunk(int bound) {
   // Up to 16 chunk work-groups per row (one per 4,096 blocks at least), as wide as the cap
   // of 16 candidate lists allows.
@@ -360,7 +397,8 @@ int qsa_select_chunk(int bound) {
 }
 
 sycl::event qsa_select(sycl::queue &q, int rows, const uint32_t *score, int stride, const int32_t *nblk, int bound, const QsaScratch &sc,
-                       sycl::event *merge, int chunk) {
+                       sycl::event *merge, int chunk, int tp_rank, int tp_size) {
+  if (tp_size < 1 || tp_rank < 0 || tp_rank >= tp_size) throw std::invalid_argument("qsa_select: invalid tensor-parallel rank");
   if (chunk <= 0) chunk = qsa_select_chunk(bound);
   if (chunk < kQsaMinChunk || chunk > kQsaPfChunk) throw std::invalid_argument("qsa_select: chunk out of range");
   const int nch = std::max(1, (bound + chunk - 1) / chunk);
@@ -443,6 +481,7 @@ sycl::event qsa_select(sycl::queue &q, int rows, const uint32_t *score, int stri
   sycl::event e = filt ? launch(std::true_type{}) : launch(std::false_type{});
   if (direct) {
     if (merge) *merge = e;
+    capture_qsa_select(q, rows, score, stride, nblk, bound, chunk, sc, tp_rank, tp_size, e, e);
     return e;
   }
   sycl::event e2 = q.submit([&](sycl::handler &h) {
@@ -461,6 +500,7 @@ sycl::event qsa_select(sycl::queue &q, int rows, const uint32_t *score, int stri
     });
   });
   if (merge) *merge = e2;
+  capture_qsa_select(q, rows, score, stride, nblk, bound, chunk, sc, tp_rank, tp_size, e, e2);
   return e;
 }
 
@@ -938,14 +978,14 @@ void decode_middle(sycl::queue &q, const QsaShape &s, int rows, const QsaWeights
     u.nblk += lo, u.sel += static_cast<size_t>(lo) * kQsaTopBlocks, u.sel_n += lo;
     u.cand_key += static_cast<size_t>(lo) * kQsaMaxChunks * kQsaTopBlocks, u.cand_id += static_cast<size_t>(lo) * kQsaMaxChunks * kQsaTopBlocks;
     u.cand_n += static_cast<size_t>(lo) * kQsaMaxChunks;
-    e.select = qsa_select(q, n, sc.score + static_cast<size_t>(lo) * stride, stride, u.nblk, std::max(1, blk_bound), u, &e.merge_sel);
+    e.select = qsa_select(q, n, sc.score + static_cast<size_t>(lo) * stride, stride, u.nblk, std::max(1, blk_bound), u, &e.merge_sel, 0, s.card, s.cards);
     sel_n_of_blocks(q, rows, sc.nblk, sc.sel_n);
     owner_share(q, rows, 2 * kQsaTopBlocks, reinterpret_cast<bf16 *>(sc.sel), *sc.sel_share, sc.sel_parity);
     stamp_stage(q, sc, QsaStage::select);
   } else {
     e.score = score<TREE>(q, rows, c, sw, blk_bound, sc, stride);
     stamp_stage(q, sc, QsaStage::score);
-    e.select = qsa_select(q, rows, sc.score, stride, sc.nblk, std::max(1, blk_bound), sc, &e.merge_sel);
+    e.select = qsa_select(q, rows, sc.score, stride, sc.nblk, std::max(1, blk_bound), sc, &e.merge_sel, 0, s.card, s.cards);
     stamp_stage(q, sc, QsaStage::select);
   }
   e.attn = attn_kv<TREE>(q, s, rows, c, sw, sc);
@@ -1007,10 +1047,39 @@ QsaEvents qsa_decode(sycl::queue &q, const QsaShape &s, int rows, const bf16 *x,
   stamp_stage(q, sc, QsaStage::projections);
   if (step.tree) decode_middle<true>(q, s, rows, w, c, rope, sw, sc, blk_bound, stride, step.every, e);
   else decode_middle<false>(q, s, rows, w, c, rope, sw, sc, blk_bound, stride, step.every, e);
+  capture_qsa_sparse_attention(q, s, rows, c, step, sc, w.qkv.n, e.merge);
   e.o = dense_gemm(q, rows, sc.attn, w.o, sc.partial, o_ks);
   e.reduce = pair_reduce(q, rows, s.hidden, sc.partial, wire, wire_parity, out);
   return e;
 }
+
+namespace xrv {
+
+QsaEvents sparse_attention(sycl::queue &q, const QsaShape &s, int rows, const QsaCache &c, const QsaStep &step, const QsaScratch &sc,
+                           int projection_stride, int tiles_per_group) {
+  if (rows < 1 || rows > kMaxRows) throw std::invalid_argument("qsa XRV sparse_attention: rows 1..8");
+  check_heads(s, "qsa XRV sparse_attention");
+  if (s.kv != QsaKv::i8v4) throw std::invalid_argument("qsa XRV sparse_attention: fixture adapter requires packed K8V4 cache");
+  if (step.tree) throw std::invalid_argument("qsa XRV sparse_attention: tree rows are not supported by this fixture adapter");
+  if (!step.pos || c.max_tokens % kQsaPage || c.max_tokens > kQsaMaxTokens || step.pos_bound < rows || step.pos_bound > c.max_tokens ||
+      c.slot_pages < c.max_tokens / kQsaPage)
+    throw std::invalid_argument("qsa XRV sparse_attention: invalid cache capacity or position bound");
+  if (!c.k || !c.v || !c.pages || (qsa_kv_scaled(s.kv) && (!c.ks || !c.vs)))
+    throw std::invalid_argument("qsa XRV sparse_attention: cache tensors are incomplete");
+  if (!seg_rows_ok(rows, step.seg_rows, step.stride) || (step.seg_rows > 0 && step.stride < kSegRec))
+    throw std::invalid_argument("qsa XRV sparse_attention: segments need records (stride >= kSegRec)");
+  if (projection_stride < s.q_n() || tiles_per_group < 1 || tiles_per_group > kQsaTiles)
+    throw std::invalid_argument("qsa XRV sparse_attention: invalid projection stride or tile grouping");
+  if (!sc.q || !sc.y || !sc.sel || !sc.sel_n || !sc.part || !sc.attn)
+    throw std::invalid_argument("qsa XRV sparse_attention: query, gate, selection, partial and output buffers are required");
+  const SegW sw{step.pos, step.stride, step.seg_rows};
+  QsaEvents e;
+  e.attn = attn_kv(q, s, rows, c, sw, sc, tiles_per_group);
+  e.merge = merge(q, s, rows, projection_stride, sw, sc, tiles_per_group);
+  return e;
+}
+
+}  // namespace xrv
 
 QsaEvents qsa_store(sycl::queue &q, const QsaShape &s, int rows, const bf16 *x, const QsaWeights &w, const QsaCache &c, const bf16 *rope,
                     const QsaStep &step, const QsaScratch &sc, int qkv_ks) {
@@ -1178,7 +1247,7 @@ QsaEvents qsa_rows(sycl::queue &q, const QsaShape &s, int m, const bf16 *x, cons
     // prefill batches: one select launch up to kQsaPfChunk blocks (no merge launch); past it kQsaChunk-block chunks.
     // An exact top-k: the same bits either way.
     const int pf_chunk = blk_bound <= kQsaPfChunk ? kQsaPfChunk : kQsaChunk;
-    e.select = traced(QsaStage::select, qsa_select(q, rows, u.score, stride, u.nblk, blk_bound, u, &e.merge_sel, pf_chunk));
+    e.select = traced(QsaStage::select, qsa_select(q, rows, u.score, stride, u.nblk, blk_bound, u, &e.merge_sel, pf_chunk, s.card, s.cards));
     if (e.merge_sel != e.select) traced(QsaStage::select, e.merge_sel);  // the chunked select's merge (direct: the same launch)
     return true;
   };
